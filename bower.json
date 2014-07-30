@@ -1,0 +1,19 @@
+{
+  "name": "github-concerto",
+  "version": "0.0.0",
+  "authors": [
+    "Yuri Feldman <yuri@tbqh.net>"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "vendor",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "d3": "~3.4.11"
+  }
+}
