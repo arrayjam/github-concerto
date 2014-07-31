@@ -5,3 +5,7 @@ gem "dotenv"
 gem "netrc"
 gem "faraday-http-cache"
 
+gem "sinatra"
+gem "rerun"
+gem "guard-livereload"
+

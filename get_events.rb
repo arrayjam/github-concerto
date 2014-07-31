@@ -13,10 +13,10 @@ stack = Faraday::RackBuilder.new do |builder|
 end
 Octokit.middleware = stack
 
-#Octokit.auto_paginate = true
+Octokit.auto_paginate = true
 
 client = Octokit::Client.new :access_token => ENV["GITHUB_PERSONAL_ACCESS_TOKEN"]
 
-puts client.user_events("arrayjam")
+p client.user_events("arrayjam").length
 
 #puts client.user_events("arrayjam").map {|e| "#{e[:repo][:name]}: #{e[:type]}"}
