@@ -1,3 +1,4 @@
-# GitHub Concerto
+GitHub Concerto
+===============
 
-Third Annual GitHub Data Challenge
+Third Annual GitHub Data Challenge Entry
