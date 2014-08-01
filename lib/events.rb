@@ -23,8 +23,7 @@ class GitHubEventsFetcher
   end
 
   def issues(user=@user, repo=@repo)
-    all_issues = @client.issues "#{user}/#{repo}"
-    all_issues.map do |issue|
+    @client.issues("#{user}/#{repo}").map do |issue|
       {
         id:             issue[:id],
         issue_number:   issue[:number],
@@ -36,8 +35,7 @@ class GitHubEventsFetcher
   end
 
   def issues_events(user=@user, repo=@repo)
-    all_issues = @client.repo_issue_events "#{user}/#{repo}"
-    all_issues.map do |issue|
+    @client.repo_issue_events("#{user}/#{repo}").map do |issue|
       {
         id:             issue[:id],
         timestamp:      issue[:created_at].to_i,
@@ -48,14 +46,41 @@ class GitHubEventsFetcher
   end
 
   def commits(user=@user, repo=@repo)
-    all_commits = @client.commits "#{user}/#{repo}"
-    all_commits.map do |commit|
-      {
-        sha:            commit[:sha],
-        author:         commit_user_details(commit[:author], commit[:commit][:author]),
-        timestamp:      commit[:commit][:author][:date].to_i
+    @client.commits("#{user}/#{repo}").map(&method(:parse_commit))
+  end
+
+  def pull_commits(user=@user, repo=@repo, number)
+    @client.pull_commits("#{user}/#{repo}", number).map(&method(:parse_commit))
+  end
+
+  def pulls_and_forks(user=@user, repo=@repo)
+    forks = []
+    pulls = []
+    fork_commits = []
+    @client.pull_requests("#{user}/#{repo}", state: "all").map do |pull|
+      #binding.pry
+      pulls << {
+        event:          "pull",
+        id:             pull[:id],
+        timestamp:      pull[:created_at].to_i,
+        user:           user_details(pull[:user]),
+        pull_number:    pull[:number]
+      }
+
+      if pull[:state] == "open"
+        fork_commits.concat pull_commits(user, repo, pull[:number])
+      end
+
+      fork = pull[:head][:repo]
+      forks << {
+        event:          "fork",
+        id:             fork[:id],
+        name:           fork[:full_name],
+        timestamp:      fork[:created_at].to_i
       }
     end
+
+    [pulls, fork_commits, forks].reduce(:concat)
   end
 
   private
@@ -76,8 +101,22 @@ class GitHubEventsFetcher
       email:            commit_user[:email]
     }
   end
+
+  def parse_commit(commit)
+    {
+      event:            "commit",
+      sha:              commit[:sha],
+      user:             commit_user_details(commit[:author], commit[:commit][:author]),
+      timestamp:        commit[:commit][:author][:date].to_i,
+      message:          commit[:commit][:message]
+    }
+  end
 end
 
-fetcher = GitHubEventsFetcher.new("arrayjam", "github-concerto", :access_token => ENV["GITHUB_PERSONAL_ACCESS_TOKEN"])
-#ap fetcher.issues.concat(fetcher.issues_events).sort {|x, y| x[:timestamp] <=> y[:timestamp]}
-ap fetcher.commits
+fetcher = GitHubEventsFetcher.new("arrayjam", "tilelive_server", :access_token => ENV["GITHUB_PERSONAL_ACCESS_TOKEN"])
+time = Time.now
+ap [fetcher.issues, fetcher.issues_events, fetcher.commits, fetcher.pulls_and_forks].reduce(:concat).sort {|x, y| x[:timestamp] <=> y[:timestamp]}
+#ap fetcher.commits
+#ap fetcher.pulls_and_forks
+
+ap Time.now - time
