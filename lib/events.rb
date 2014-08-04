@@ -64,7 +64,7 @@ class GitHubEventsFetcher
   end
 
   def pull_commits(repo=@repo, number)
-    @client.pull_commits(repo).map(&method(:parse_commit))
+    @client.pull_commits(repo, number).map(&method(:parse_commit))
   end
 
   def pulls_and_forks(repo=@repo)
@@ -81,7 +81,7 @@ class GitHubEventsFetcher
       }
 
       if pull[:state] == "open"
-        fork_commits.concat pull_commits(user, repo, pull[:number])
+        fork_commits.concat pull_commits(repo, pull[:number])
       end
 
       fork = pull[:head][:repo]
@@ -96,12 +96,23 @@ class GitHubEventsFetcher
     [pulls, fork_commits, forks].reduce(:concat)
   end
 
+  def pull_comments(repo=@repo)
+    @client.pull_requests_comments(repo).map do |comment|
+      {
+        id:             comment[:id],
+        user:           user_details(comment[:user]),
+        timestamp:      comment[:created_at].to_i,
+        pull_number:    comment[:pull_request_url][/\d+$/].to_i
+      }
+    end
+  end
+
   private
   def user_details(user)
     {
       login:            user[:login],
       id:               user[:id],
-      avatar_url:       user[:avatar_url]
+      avatar_url:       user[:avatar_url],
     }
   end
 
@@ -126,11 +137,12 @@ class GitHubEventsFetcher
   end
 end
 
-fetcher = GitHubEventsFetcher.new("arrayjam", "tilelive_server", :access_token => ENV["GITHUB_PERSONAL_ACCESS_TOKEN"])
+fetcher = GitHubEventsFetcher.new("arrayjam", "github-concerto", :access_token => ENV["GITHUB_PERSONAL_ACCESS_TOKEN"])
 time = Time.now
-ap [fetcher.repository, fetcher.issues, fetcher.issues_events, fetcher.commits, fetcher.pulls_and_forks].reduce(:concat).sort {|x, y| x[:timestamp] <=> y[:timestamp]}
+#ap [fetcher.repository, fetcher.issues, fetcher.issues_events, fetcher.commits, fetcher.pulls_and_forks].reduce(:concat).sort {|x, y| x[:timestamp] <=> y[:timestamp]}
 #ap fetcher.repository
 #ap fetcher.commits
 #ap fetcher.pulls_and_forks
+ap fetcher.pull_comments
 
 ap Time.now - time
