@@ -6,9 +6,11 @@ class GitHubEventsFetcher
   require "octokit"
   require "faraday-http-cache"
 
-  def initialize(user, repo, auth)
+  def initialize(user, repo_name, auth)
     @user = user
-    @repo = repo
+    @repo_name = repo_name
+    @repo = "#{user}/#{repo_name}"
+
     @client = Octokit::Client.new(auth)
 
     stack = Faraday::RackBuilder.new do |builder|
@@ -22,8 +24,20 @@ class GitHubEventsFetcher
     Octokit.auto_paginate = true
   end
 
-  def issues(user=@user, repo=@repo)
-    @client.issues("#{user}/#{repo}").map do |issue|
+  def repository(repo=@repo)
+    r = @client.repository(repo)
+    [{
+      event:            "create_repo",
+      name:             r[:full_name],
+      user:             user_details(r[:owner]),
+      timestamp:        r[:created_at].to_i,
+      homepage:         r[:homepage],
+      description:      r[:description]
+    }]
+  end
+
+  def issues(repo=@repo)
+    @client.issues(repo).map do |issue|
       {
         id:             issue[:id],
         issue_number:   issue[:number],
@@ -34,8 +48,8 @@ class GitHubEventsFetcher
     end
   end
 
-  def issues_events(user=@user, repo=@repo)
-    @client.repo_issue_events("#{user}/#{repo}").map do |issue|
+  def issues_events(repo=@repo)
+    @client.repo_issue_events(repo).map do |issue|
       {
         id:             issue[:id],
         timestamp:      issue[:created_at].to_i,
@@ -45,20 +59,19 @@ class GitHubEventsFetcher
     end
   end
 
-  def commits(user=@user, repo=@repo)
-    @client.commits("#{user}/#{repo}").map(&method(:parse_commit))
+  def commits(repo=@repo)
+    @client.commits(repo).map(&method(:parse_commit))
   end
 
-  def pull_commits(user=@user, repo=@repo, number)
-    @client.pull_commits("#{user}/#{repo}", number).map(&method(:parse_commit))
+  def pull_commits(repo=@repo, number)
+    @client.pull_commits(repo).map(&method(:parse_commit))
   end
 
-  def pulls_and_forks(user=@user, repo=@repo)
+  def pulls_and_forks(repo=@repo)
     forks = []
     pulls = []
     fork_commits = []
-    @client.pull_requests("#{user}/#{repo}", state: "all").map do |pull|
-      #binding.pry
+    @client.pull_requests(repo).map do |pull|
       pulls << {
         event:          "pull",
         id:             pull[:id],
@@ -115,7 +128,8 @@ end
 
 fetcher = GitHubEventsFetcher.new("arrayjam", "tilelive_server", :access_token => ENV["GITHUB_PERSONAL_ACCESS_TOKEN"])
 time = Time.now
-ap [fetcher.issues, fetcher.issues_events, fetcher.commits, fetcher.pulls_and_forks].reduce(:concat).sort {|x, y| x[:timestamp] <=> y[:timestamp]}
+ap [fetcher.repository, fetcher.issues, fetcher.issues_events, fetcher.commits, fetcher.pulls_and_forks].reduce(:concat).sort {|x, y| x[:timestamp] <=> y[:timestamp]}
+#ap fetcher.repository
 #ap fetcher.commits
 #ap fetcher.pulls_and_forks
 
